@@ -49,12 +49,73 @@
 
         entries.sort((a, b) => new Date(a[1].time) - new Date(b[1].time));
 
-        const lines = entries.map(([id, data], i) =>
-            `${i + 1}. 📄 ${data.name}\n   🕒 ${data.time}`
-        );
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: 99999; display: flex; justify-content: center; align-items: center;
+        `;
 
-        alert(`Downloaded Files for course ${COURSE_ID}:\n\n${lines.join('\n\n')}`);
+        const box = document.createElement('div');
+        box.style.cssText = `
+            background: white; padding: 20px; border-radius: 8px;
+            width: 500px; max-height: 70vh; overflow-y: auto;
+            font-family: sans-serif;
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = `📋 Downloaded Files for Course ${COURSE_ID}`;
+        box.appendChild(title);
+
+        entries.forEach(([id, data], index) => {
+            const line = document.createElement('div');
+            line.style.cssText = `margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;`;
+
+            const label = document.createElement('div');
+            label.innerHTML = `<strong>${index + 1}. ${data.name}</strong><br><small>🕒 ${data.time}</small>`;
+
+            const delBtn = document.createElement('button');
+            delBtn.textContent = "❌";
+            delBtn.style.cssText = `
+                background: #ff4d4d;
+                border: none;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 5px;
+                cursor: pointer;
+            `;
+            delBtn.onclick = () => {
+                if (confirm(`Delete "${data.name}" from downloaded record?`)) {
+                    delete map[id];
+                    saveDownloadMap(map);
+                    overlay.remove();
+                    viewDownloadedIDs();  // re-render
+                }
+            };
+
+            line.appendChild(label);
+            line.appendChild(delBtn);
+            box.appendChild(line);
+        });
+
+        const close = document.createElement('button');
+        close.textContent = "Close";
+        close.style.cssText = `
+            margin-top: 15px;
+            background: #333;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        `;
+        close.onclick = () => document.body.removeChild(overlay);
+
+        box.appendChild(close);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
     }
+
 
     function getFolderPath(folder_id, callback) {
         if (folder_id == null) return callback('');
