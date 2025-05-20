@@ -37,7 +37,7 @@
         localStorage.removeItem(STORAGE_KEY);
         alert(`🗑️ Download history for course ${COURSE_ID} cleared.`);
     }
-
+    
     function viewDownloadedIDs() {
         const map = loadDownloadMap();
         const entries = Object.entries(map);
@@ -47,6 +47,7 @@
             return;
         }
 
+        // Sort entries chronologically
         entries.sort((a, b) => new Date(a[1].time) - new Date(b[1].time));
 
         const overlay = document.createElement('div');
@@ -59,7 +60,7 @@
         const box = document.createElement('div');
         box.style.cssText = `
             background: white; padding: 20px; border-radius: 8px;
-            width: 500px; max-height: 70vh; overflow-y: auto;
+            width: 550px; max-height: 80vh; overflow-y: auto;
             font-family: sans-serif; box-shadow: 0 0 10px rgba(0,0,0,0.3);
         `;
 
@@ -67,39 +68,74 @@
         title.textContent = `📋 Downloaded Files for Course ${COURSE_ID}`;
         box.appendChild(title);
 
-        entries.forEach(([id, data], index) => {
-            const line = document.createElement('div');
-            line.style.cssText = `margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;`;
+        // Search input
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = '🔍 Search by filename...';
+        searchInput.style.cssText = `
+            width: 100%; padding: 8px; margin-bottom: 12px;
+            border-radius: 5px; border: 1px solid #ccc;
+            font-size: 14px;
+        `;
+        box.appendChild(searchInput);
 
-            const label = document.createElement('div');
-            label.innerHTML = `<strong>${index + 1}. ${data.name}</strong><br><small>🕒 ${data.time}</small>`;
+        // Container for file entries
+        const fileList = document.createElement('div');
+        box.appendChild(fileList);
 
-            const delBtn = document.createElement('button');
-            delBtn.innerHTML = "🗑️";
-            delBtn.title = "Delete this file from record";
-            delBtn.style.cssText = `
-                background: #ffdddd;
-                border: none;
-                font-size: 16px;
-                padding: 4px 8px;
-                border-radius: 5px;
-                cursor: pointer;
-                transition: background 0.2s;
-            `;
-            delBtn.onmouseenter = () => delBtn.style.background = "#ffaaaa";
-            delBtn.onmouseleave = () => delBtn.style.background = "#ffdddd";
-            delBtn.onclick = () => {
-                if (confirm(`Delete "${data.name}" from downloaded record?`)) {
-                    delete map[id];
-                    saveDownloadMap(map);
-                    overlay.remove();
-                    viewDownloadedIDs();  // re-render
-                }
-            };
+        const renderFileList = (filter = '') => {
+            fileList.innerHTML = ''; // clear
+            let count = 0;
 
-            line.appendChild(label);
-            line.appendChild(delBtn);
-            box.appendChild(line);
+            entries.forEach(([id, data], index) => {
+                if (!data.name.toLowerCase().includes(filter.toLowerCase())) return;
+
+                const line = document.createElement('div');
+                line.style.cssText = `margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;`;
+
+                const label = document.createElement('div');
+                label.innerHTML = `<strong>${data.name}</strong><br><small>🕒 ${data.time}</small>`;
+
+                const delBtn = document.createElement('button');
+                delBtn.innerHTML = "🗑️";
+                delBtn.title = "Delete this file from record";
+                delBtn.style.cssText = `
+                    background: #ffdddd;
+                    border: none;
+                    font-size: 16px;
+                    padding: 4px 8px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                `;
+                delBtn.onmouseenter = () => delBtn.style.background = "#ffaaaa";
+                delBtn.onmouseleave = () => delBtn.style.background = "#ffdddd";
+                delBtn.onclick = () => {
+                    if (confirm(`Delete "${data.name}" from downloaded record?`)) {
+                        delete map[id];
+                        saveDownloadMap(map);
+                        overlay.remove();
+                        viewDownloadedIDs();  // re-render everything
+                    }
+                };
+
+                line.appendChild(label);
+                line.appendChild(delBtn);
+                fileList.appendChild(line);
+                count++;
+            });
+
+            if (count === 0) {
+                fileList.innerHTML = `<i>No matching results.</i>`;
+            }
+        };
+
+        // Initial render
+        renderFileList();
+
+        // Bind live filter
+        searchInput.addEventListener('input', () => {
+            renderFileList(searchInput.value);
         });
 
         const close = document.createElement('button');
