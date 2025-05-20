@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Canvas File Downloader (Full Version)
+// @name         Canvas File Downloader v3 (Full Features)
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  Download new Canvas files with proper folder structure and tracking
+// @version      3.0
+// @description  Download new Canvas files by course, preserve folder structure, view history
 // @match        https://oc.sjtu.edu.cn/courses/*/files*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
@@ -14,39 +14,50 @@
     'use strict';
 
     const COURSE_ID = window.location.pathname.match(/courses\/(\d+)/)[1];
-    const STORAGE_KEY = `canvas_downloaded_file_ids_${COURSE_ID}`;
-    const COURSE_FOLDER = COURSE_ID; // e.g., 80071
+    const STORAGE_KEY = `canvas_downloaded_file_map_${COURSE_ID}`;
+    const COURSE_FOLDER = COURSE_ID;
     const API_FILES = `https://oc.sjtu.edu.cn/api/v1/courses/${COURSE_ID}/files?per_page=100`;
     const API_FOLDERS = `https://oc.sjtu.edu.cn/api/v1/folders/`;
 
-    // Load and save downloaded IDs
-    function loadDownloadedIDs() {
-        return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+    const folderPathCache = {};
+
+    function sanitizePath(path) {
+        return path.replace(/[:*?"<>|\\]/g, "_");
     }
 
-    function saveDownloadedIDs(set) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
+    function loadDownloadMap() {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     }
 
-    function resetDownloadedIDs() {
+    function saveDownloadMap(map) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    }
+
+    function resetDownloadMap() {
         localStorage.removeItem(STORAGE_KEY);
         alert(`🗑️ Download history for course ${COURSE_ID} cleared.`);
     }
 
     function viewDownloadedIDs() {
-        const set = loadDownloadedIDs();
-        if (set.size === 0) {
+        const map = loadDownloadMap();
+        const entries = Object.entries(map);
+
+        if (entries.length === 0) {
             alert("No files have been downloaded yet.");
-        } else {
-            alert(`Downloaded file IDs for course ${COURSE_ID}:\n` + [...set].join(", "));
+            return;
         }
+
+        entries.sort((a, b) => new Date(a[1].time) - new Date(b[1].time));
+
+        const lines = entries.map(([id, data], i) =>
+            `${i + 1}. 📄 ${data.name}\n   🕒 ${data.time}`
+        );
+
+        alert(`Downloaded Files for course ${COURSE_ID}:\n\n${lines.join('\n\n')}`);
     }
 
-    // Cache to avoid repeated folder lookups
-    const folderPathCache = {};
-
     function getFolderPath(folder_id, callback) {
-        if (folder_id === null || folder_id === undefined) return callback('');
+        if (folder_id == null) return callback('');
         if (folderPathCache[folder_id]) return callback(folderPathCache[folder_id]);
 
         GM_xmlhttpRequest({
@@ -56,22 +67,17 @@
             onload: function (res) {
                 if (res.status === 200) {
                     const folder = JSON.parse(res.responseText);
-                    // recursively resolve parent folders
                     getFolderPath(folder.parent_folder_id, (parentPath) => {
                         const fullPath = parentPath + folder.name + '/';
                         folderPathCache[folder_id] = fullPath;
                         callback(fullPath);
                     });
                 } else {
-                    console.error("Failed to fetch folder:", res);
+                    console.error("❌ Failed to fetch folder:", res);
                     callback('');
                 }
             }
         });
-    }
-
-    function sanitizePath(path) {
-        return path.replace(/[:*?"<>|\\]/g, "_");
     }
 
     function fetchCanvasFiles(callback) {
@@ -90,40 +96,46 @@
     }
 
     function checkAndDownload() {
-        const downloaded = loadDownloadedIDs();
+        const downloadedMap = loadDownloadMap();
 
         fetchCanvasFiles(files => {
-            const newFiles = files.filter(f => !downloaded.has(f.id));
+            const newFiles = files.filter(f => !(f.id in downloadedMap));
             if (newFiles.length === 0) {
                 alert("✅ No new files found.");
                 return;
             }
 
-            let count = 0;
+            let completed = 0;
             newFiles.forEach(file => {
                 getFolderPath(file.folder_id, folderPath => {
-                    const fullPath = sanitizePath(`${COURSE_FOLDER}/${folderPath}${file.display_name}`);
-                    console.log("📥 Downloading:", fullPath);
+                    const relativePath = sanitizePath(`${COURSE_FOLDER}/${folderPath}${file.display_name}`);
+                    console.log("📥 Downloading:", relativePath);
 
                     GM_download({
                         url: file.url,
-                        name: fullPath,
+                        name: relativePath,
                         onerror: () => alert(`❌ Failed to download ${file.display_name}`)
                     });
 
-                    downloaded.add(file.id);
-                    count++;
-                    saveDownloadedIDs(downloaded);
+                    // Save with readable name and time
+                    downloadedMap[file.id] = {
+                        name: file.display_name,
+                        time: new Date().toLocaleString()
+                    };
+
+                    completed++;
+                    if (completed === newFiles.length) {
+                        saveDownloadMap(downloadedMap);
+                        alert(`✅ Downloaded ${completed} new file(s).`);
+                    }
                 });
             });
-
-            alert(`📥 Queued ${newFiles.length} new file(s) for download.`);
         });
     }
 
-    // Register commands in Tampermonkey menu
+    // Tampermonkey menu
     GM_registerMenuCommand("📥 Check & Download New Files", checkAndDownload);
-    GM_registerMenuCommand("📋 View Downloaded File IDs", viewDownloadedIDs);
-    GM_registerMenuCommand("🗑️ Reset Download History", resetDownloadedIDs);
+    GM_registerMenuCommand("📋 View Downloaded Files", viewDownloadedIDs);
+    GM_registerMenuCommand("🗑️ Reset Download History", resetDownloadMap);
 
 })();
