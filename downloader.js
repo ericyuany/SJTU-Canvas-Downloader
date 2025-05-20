@@ -15,7 +15,7 @@
 
     const COURSE_ID = window.location.pathname.match(/courses\/(\d+)/)[1];
     const STORAGE_KEY = `canvas_downloaded_file_map_${COURSE_ID}`;
-    const COURSE_FOLDER = COURSE_ID;
+    const COURSE_FOLDER = document.querySelectorAll('#breadcrumbs a > span.ellipsible')[1]?.innerText.trim() || `Course_${COURSE_ID}`;
     const API_FILES = `https://oc.sjtu.edu.cn/api/v1/courses/${COURSE_ID}/files?per_page=100`;
     const API_FOLDERS = `https://oc.sjtu.edu.cn/api/v1/folders/`;
 
@@ -37,7 +37,7 @@
         localStorage.removeItem(STORAGE_KEY);
         alert(`🗑️ Download history for course ${COURSE_ID} cleared.`);
     }
-    
+
     function viewDownloadedIDs() {
         const map = loadDownloadMap();
         const entries = Object.entries(map);
