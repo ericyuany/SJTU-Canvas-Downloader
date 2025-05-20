@@ -39,122 +39,148 @@
     }
 
     function viewDownloadedIDs() {
-        const map = loadDownloadMap();
-        const entries = Object.entries(map);
+    const map = loadDownloadMap();
+    const entries = Object.entries(map);
 
-        if (entries.length === 0) {
-            alert("No files have been downloaded yet.");
-            return;
+    if (entries.length === 0) {
+        alert("No files have been downloaded yet.");
+        return;
+    }
+
+    // Sort entries chronologically
+    entries.sort((a, b) => new Date(a[1].time) - new Date(b[1].time));
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background-color: rgba(0, 0, 0, 0.4);
+        z-index: 99999; display: flex; justify-content: center; align-items: center;
+    `;
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+        position: relative;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        width: 550px;
+        max-height: 80vh;
+        overflow-y: auto;
+        font-family: sans-serif;
+        box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    `;
+
+    // Top bar: Title + Close button
+    const titleBar = document.createElement('div');
+    titleBar.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
+
+    const title = document.createElement('h3');
+    title.textContent = `📋 Downloaded Files for Course ${COURSE_ID}`;
+    title.style.margin = 0;
+
+    const close = document.createElement('button');
+    close.textContent = "×";
+    close.title = "Close";
+    close.style.cssText = `
+        background: none;
+        color: #888;
+        border: none;
+        font-size: 20px;
+        font-weight: bold;
+        cursor: pointer;
+    `;
+    close.onmouseenter = () => close.style.color = "#000";
+    close.onmouseleave = () => close.style.color = "#888";
+    close.onclick = () => {
+        document.body.removeChild(overlay);
+        window.removeEventListener("keydown", escListener);
+    };
+
+    titleBar.appendChild(title);
+    titleBar.appendChild(close);
+    box.appendChild(titleBar);
+
+    // ESC key listener
+    const escListener = (e) => {
+        if (e.key === "Escape") {
+            document.body.removeChild(overlay);
+            window.removeEventListener("keydown", escListener);
         }
+    };
+    window.addEventListener("keydown", escListener);
 
-        // Sort entries chronologically
-        entries.sort((a, b) => new Date(a[1].time) - new Date(b[1].time));
+    // Search input
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = '🔍 Search by filename...';
+    searchInput.style.cssText = `
+        width: 100%;
+        padding: 8px;
+        margin: 12px 0;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        font-size: 14px;
+    `;
+    box.appendChild(searchInput);
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(0, 0, 0, 0.4);
-            z-index: 99999; display: flex; justify-content: center; align-items: center;
-        `;
+    // Container for file entries
+    const fileList = document.createElement('div');
+    box.appendChild(fileList);
 
-        const box = document.createElement('div');
-        box.style.cssText = `
-            background: white; padding: 20px; border-radius: 8px;
-            width: 550px; max-height: 80vh; overflow-y: auto;
-            font-family: sans-serif; box-shadow: 0 0 10px rgba(0,0,0,0.3);
-        `;
+    const renderFileList = (filter = '') => {
+        fileList.innerHTML = ''; // clear
+        let count = 0;
 
-        const title = document.createElement('h3');
-        title.textContent = `📋 Downloaded Files for Course ${COURSE_ID}`;
-        box.appendChild(title);
+        entries.forEach(([id, data]) => {
+            if (!data.name.toLowerCase().includes(filter.toLowerCase())) return;
 
-        // Search input
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.placeholder = '🔍 Search by filename...';
-        searchInput.style.cssText = `
-            width: 100%; padding: 8px; margin-bottom: 12px;
-            border-radius: 5px; border: 1px solid #ccc;
-            font-size: 14px;
-        `;
-        box.appendChild(searchInput);
+            const line = document.createElement('div');
+            line.style.cssText = `margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;`;
 
-        // Container for file entries
-        const fileList = document.createElement('div');
-        box.appendChild(fileList);
+            const label = document.createElement('div');
+            label.innerHTML = `<strong>${data.name}</strong><br><small>🕒 ${data.time}</small>`;
 
-        const renderFileList = (filter = '') => {
-            fileList.innerHTML = ''; // clear
-            let count = 0;
+            const delBtn = document.createElement('button');
+            delBtn.innerHTML = "🗑️";
+            delBtn.title = "Delete this file from record";
+            delBtn.style.cssText = `
+                background: #ffdddd;
+                border: none;
+                font-size: 16px;
+                padding: 4px 8px;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: background 0.2s;
+            `;
+            delBtn.onmouseenter = () => delBtn.style.background = "#ffaaaa";
+            delBtn.onmouseleave = () => delBtn.style.background = "#ffdddd";
+            delBtn.onclick = () => {
+                if (confirm(`Delete "${data.name}" from downloaded record?`)) {
+                    delete map[id];
+                    saveDownloadMap(map);
+                    overlay.remove();
+                    viewDownloadedIDs();  // re-render
+                }
+            };
 
-            entries.forEach(([id, data], index) => {
-                if (!data.name.toLowerCase().includes(filter.toLowerCase())) return;
-
-                const line = document.createElement('div');
-                line.style.cssText = `margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;`;
-
-                const label = document.createElement('div');
-                label.innerHTML = `<strong>${data.name}</strong><br><small>🕒 ${data.time}</small>`;
-
-                const delBtn = document.createElement('button');
-                delBtn.innerHTML = "🗑️";
-                delBtn.title = "Delete this file from record";
-                delBtn.style.cssText = `
-                    background: #ffdddd;
-                    border: none;
-                    font-size: 16px;
-                    padding: 4px 8px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    transition: background 0.2s;
-                `;
-                delBtn.onmouseenter = () => delBtn.style.background = "#ffaaaa";
-                delBtn.onmouseleave = () => delBtn.style.background = "#ffdddd";
-                delBtn.onclick = () => {
-                    if (confirm(`Delete "${data.name}" from downloaded record?`)) {
-                        delete map[id];
-                        saveDownloadMap(map);
-                        overlay.remove();
-                        viewDownloadedIDs();  // re-render everything
-                    }
-                };
-
-                line.appendChild(label);
-                line.appendChild(delBtn);
-                fileList.appendChild(line);
-                count++;
-            });
-
-            if (count === 0) {
-                fileList.innerHTML = `<i>No matching results.</i>`;
-            }
-        };
-
-        // Initial render
-        renderFileList();
-
-        // Bind live filter
-        searchInput.addEventListener('input', () => {
-            renderFileList(searchInput.value);
+            line.appendChild(label);
+            line.appendChild(delBtn);
+            fileList.appendChild(line);
+            count++;
         });
 
-        const close = document.createElement('button');
-        close.textContent = "Close";
-        close.style.cssText = `
-            margin-top: 15px;
-            background: #333;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        `;
-        close.onclick = () => document.body.removeChild(overlay);
+        if (count === 0) {
+            fileList.innerHTML = `<i>No matching results.</i>`;
+        }
+    };
 
-        box.appendChild(close);
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
-    }
+    renderFileList();
+    searchInput.addEventListener('input', () => renderFileList(searchInput.value));
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
 
 
 
