@@ -60,7 +60,7 @@
         box.style.cssText = `
             background: white; padding: 20px; border-radius: 8px;
             width: 500px; max-height: 70vh; overflow-y: auto;
-            font-family: sans-serif;
+            font-family: sans-serif; box-shadow: 0 0 10px rgba(0,0,0,0.3);
         `;
 
         const title = document.createElement('h3');
@@ -75,15 +75,19 @@
             label.innerHTML = `<strong>${index + 1}. ${data.name}</strong><br><small>🕒 ${data.time}</small>`;
 
             const delBtn = document.createElement('button');
-            delBtn.textContent = "❌";
+            delBtn.innerHTML = "🗑️";
+            delBtn.title = "Delete this file from record";
             delBtn.style.cssText = `
-                background: #ff4d4d;
+                background: #ffdddd;
                 border: none;
-                color: white;
-                padding: 5px 10px;
+                font-size: 16px;
+                padding: 4px 8px;
                 border-radius: 5px;
                 cursor: pointer;
+                transition: background 0.2s;
             `;
+            delBtn.onmouseenter = () => delBtn.style.background = "#ffaaaa";
+            delBtn.onmouseleave = () => delBtn.style.background = "#ffdddd";
             delBtn.onclick = () => {
                 if (confirm(`Delete "${data.name}" from downloaded record?`)) {
                     delete map[id];
@@ -115,6 +119,7 @@
         overlay.appendChild(box);
         document.body.appendChild(overlay);
     }
+
 
 
     function getFolderPath(folder_id, callback) {
